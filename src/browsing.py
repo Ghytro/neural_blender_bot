@@ -34,15 +34,51 @@ async def get_picture(browser, title) -> str:
     return img_src
 
 
-def generate_browser_instances(amount):
+async def generate_browser_instances(amount):
+    class AtomicCounter:
+        def __init__(self):
+            self.__value = 0
+            self.__mutex = threading.Lock()
+        
+        def inc(self):
+            with self.__mutex:
+                self.__value += 1
+                return self.__value
+
+        def postfix_inc(self):
+            with self.__mutex:
+                old_value = self.__value
+                self.__value += 1
+                return old_value
+
+        def value(self):
+            with self.__mutex:
+                return self.__value
+    
+    async def async_range(n):
+        for i in range(n):
+            yield i
+            await asyncio.sleep(0.0)
+    
+    async def async_enumerate(iterable):
+        for idx, val in enumerate(iterable):
+            yield idx, val
+            await asyncio.sleep(0.0)
+
     browser_instances = [None for _ in range(amount)]
-    def worker(index: int):
-        browser_instances[index] = webdriver.Chrome()
-        browser_instances[index].get("https://neuralblender.com/create-art")
+    launched_browsers = AtomicCounter()
+
+    def worker(idx):
+        browser_instances[idx] = webdriver.Chrome()
+        browser_instances[idx].get("https://neuralblender.com/create-art")
+        launched_browsers.inc()
+
     workers = []
-    for i, _ in enumerate(browser_instances):
+    async for i in async_range(amount):
         workers.append(threading.Thread(target=worker, args=(i,)))
         workers[-1].start()
-    for i, _ in enumerate(workers):
+    while launched_browsers.value() != amount:
+        await asyncio.sleep(.1)
+    async for i, _ in async_enumerate(workers):
         workers[i].join()
     return browser_instances
