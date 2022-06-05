@@ -27,11 +27,12 @@ logger = logging.getLogger(__name__)
 
 
 class Bot:
+    __reserved_methods = ["run_polling"]
     def __init__(self):
         self.__application = Application.builder().token(BOT_CONFIG["token"]).build()
         for attr_name in dir(self):
             attr = getattr(self, attr_name)
-            if callable(attr) and not attr_name.startswith("__"):
+            if callable(attr) and not attr_name.startswith("__") and attr_name not in self.__reserved_methods:
                 self.__application.add_handler(CommandHandler(attr_name, attr))
         self.__application.add_handler(
             MessageHandler(
